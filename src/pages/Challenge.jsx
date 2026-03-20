@@ -7,7 +7,8 @@ import RecordingPlayer from '../components/RecordingPlayer';
 import SpeechAnalysis from '../components/SpeechAnalysis';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { analyzeSpeech } from '../utils/analyzeSpeech';
-import { Mic, Video, VideoOff, Play, Pause, CheckCircle, RefreshCw } from 'lucide-react';
+import { transcribeWithNvidia } from '../services/nvidiaTranscription';
+import { Mic, Video, VideoOff, Play, Pause, CheckCircle, RefreshCw, Loader } from 'lucide-react';
 import './Challenge.css';
 
 const TOTAL_SECONDS = 60;
@@ -23,25 +24,22 @@ export default function Challenge() {
     const [countdownVal, setCountdownVal] = useState(3);
     const [earnedPoints, setEarnedPoints] = useState(null);
 
-    // Recording mode & state
+    // Recording
     const [recordingMode, setRecordingMode] = useState('audio');
     const [isRecording, setIsRecording] = useState(false);
     const [mediaDataUrl, setMediaDataUrl] = useState(null);
     const [mediaType, setMediaType] = useState(null);
 
-    // Speech recognition
-    const {
-        supported: srSupported,
-        finalTranscript,
-        interimTranscript,
-        start: srStart,
-        stop: srStop,
-    } = useSpeechRecognition();
+    // Speech recognition (live, browser-side)
+    const { supported: srSupported, finalTranscript, interimTranscript, start: srStart, stop: srStop } = useSpeechRecognition();
 
-    // Analysis (computed once session is done)
+    // Post-session analysis
     const [analysis, setAnalysis] = useState(null);
-    const elapsedRef = useRef(0); // track duration actually spoken
+    const [transcribing, setTranscribing] = useState(false);
+    const [nvidiaError, setNvidiaError] = useState(null);
 
+    const elapsedRef = useRef(0);    // seconds actually spoken
+    const audioBlobRef = useRef(null); // raw blob → NVIDIA
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
     const streamRef = useRef(null);
@@ -54,12 +52,12 @@ export default function Challenge() {
         setTopic(pool[Math.floor(Math.random() * pool.length)]);
         setPhase('idle');
         setTimeLeft(TOTAL_SECONDS);
-        setMediaDataUrl(null);
-        setMediaType(null);
-        setEarnedPoints(null);
-        setAnalysis(null);
-        stopMedia();
-        srStop();
+        setMediaDataUrl(null); setMediaType(null);
+        setEarnedPoints(null); setAnalysis(null);
+        setNvidiaError(null); setTranscribing(false);
+        audioBlobRef.current = null;
+        elapsedRef.current = 0;
+        stopMedia(); srStop();
     }
 
     // ── Session flow ───────────────────────────────────────────
@@ -76,7 +74,7 @@ export default function Challenge() {
         if (countdownVal <= 0) {
             setPhase('running');
             beginRecording();
-            srStart(); // start speech recognition
+            srStart();
             return;
         }
         const t = setTimeout(() => setCountdownVal(v => v - 1), 1000);
@@ -111,10 +109,25 @@ export default function Challenge() {
     async function finishSession() {
         setPhase('done');
         srStop();
-        await stopMedia();
-        // Run analysis using the final transcript captured so far
-        const result = analyzeSpeech(finalTranscript, elapsedRef.current || TOTAL_SECONDS);
-        setAnalysis(result);
+        await stopMedia(); // fills audioBlobRef.current
+
+        // 1. Try NVIDIA transcription (better quality)
+        let bestTranscript = finalTranscript;
+        if (audioBlobRef.current) {
+            setTranscribing(true);
+            const { transcript: nvidiaText, error } = await transcribeWithNvidia(audioBlobRef.current);
+            setTranscribing(false);
+
+            if (nvidiaText) {
+                bestTranscript = nvidiaText; // NVIDIA wins
+            } else {
+                setNvidiaError(error || 'NVIDIA transcription failed — using browser transcript.');
+            }
+        }
+
+        // 2. Analyse whichever transcript is best
+        const result = analyzeSpeech(bestTranscript, elapsedRef.current || TOTAL_SECONDS);
+        setAnalysis({ ...result, _transcript: bestTranscript, _source: audioBlobRef.current ? 'nvidia' : 'browser' });
     }
 
     async function handleFinishEarly() {
@@ -145,20 +158,27 @@ export default function Challenge() {
             const mr = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mr;
             mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+
             mr.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: mimeType });
+
+                // Keep raw blob for NVIDIA (audio only — video too large)
                 if (recordingMode === 'audio') {
+                    audioBlobRef.current = blob;
                     const reader = new FileReader();
                     reader.onloadend = () => { setMediaDataUrl(reader.result); setMediaType('audio'); };
                     reader.readAsDataURL(blob);
                 } else {
+                    audioBlobRef.current = null;
                     setMediaDataUrl(URL.createObjectURL(blob));
                     setMediaType('video');
                 }
+
                 stream.getTracks().forEach(t => t.stop());
                 setIsRecording(false);
                 if (videoPreviewRef.current) videoPreviewRef.current.srcObject = null;
             };
+
             mr.start();
             setIsRecording(true);
         } catch (err) {
@@ -190,7 +210,8 @@ export default function Challenge() {
         setPhase('idle'); setTimeLeft(TOTAL_SECONDS);
         setTopic(null); setMediaDataUrl(null);
         setMediaType(null); setEarnedPoints(null); setAnalysis(null);
-        elapsedRef.current = 0;
+        setNvidiaError(null); setTranscribing(false);
+        elapsedRef.current = 0; audioBlobRef.current = null;
     }
 
     const diffLabels = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
@@ -205,24 +226,20 @@ export default function Challenge() {
                     <p>Pick a topic, hit start, and speak for 60 seconds.</p>
                 </div>
 
-                {/* Settings (shown only on idle) */}
+                {/* Settings */}
                 {phase === 'idle' && !earnedPoints && (
                     <div className="settings-row animate-fadeIn">
                         <div className="setting-group">
                             <span className="setting-label">Difficulty</span>
                             <div className="seg-control">
                                 {['easy', 'medium', 'hard'].map(d => (
-                                    <button
-                                        key={d}
-                                        className={`seg-btn ${difficulty === d ? 'active' : ''}`}
-                                        onClick={() => { setDifficulty(d); setTopic(null); }}
-                                    >
+                                    <button key={d} className={`seg-btn ${difficulty === d ? 'active' : ''}`}
+                                        onClick={() => { setDifficulty(d); setTopic(null); }}>
                                         {d === 'easy' ? '🟢' : d === 'medium' ? '🟡' : '🔴'} {diffLabels[d]}
                                     </button>
                                 ))}
                             </div>
                         </div>
-
                         <div className="setting-group">
                             <span className="setting-label">Record</span>
                             <div className="seg-control">
@@ -289,10 +306,7 @@ export default function Challenge() {
                     {(phase === 'running' || phase === 'paused') && srSupported && (
                         <div className="live-transcript-strip">
                             {finalTranscript || interimTranscript
-                                ? <>
-                                    <span>{finalTranscript}</span>
-                                    {interimTranscript && <span className="interim"> {interimTranscript}</span>}
-                                </>
+                                ? <><span>{finalTranscript}</span>{interimTranscript && <span className="interim"> {interimTranscript}</span>}</>
                                 : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Listening… start speaking</span>
                             }
                         </div>
@@ -313,25 +327,39 @@ export default function Challenge() {
                                 </div>
                             ) : (
                                 <div className="done-actions">
-                                    {/* Recording playback */}
+                                    {/* Playback */}
                                     {mediaDataUrl && <RecordingPlayer src={mediaDataUrl} type={mediaType} />}
                                     {mediaDataUrl && mediaType === 'video' && (
                                         <p className="video-note">Video is session-only and won't be saved to history.</p>
                                     )}
 
-                                    {/* Speech analysis */}
-                                    {analysis && (
+                                    {/* NVIDIA loading state */}
+                                    {transcribing && (
+                                        <div className="transcribing-banner">
+                                            <Loader size={14} className="spin-icon" />
+                                            Transcribing with NVIDIA AI…
+                                        </div>
+                                    )}
+
+                                    {nvidiaError && <p className="transcribe-error">⚠️ {nvidiaError}</p>}
+
+                                    {/* Analysis — shown after NVIDIA returns */}
+                                    {analysis && !transcribing && (
                                         <SpeechAnalysis
                                             analysis={analysis}
-                                            transcript={finalTranscript}
-                                            supported={srSupported}
+                                            transcript={analysis._transcript || finalTranscript}
+                                            supported={true}
                                         />
                                     )}
 
-                                    <button className="btn btn-primary btn-lg" onClick={saveAndContinue}>
-                                        <CheckCircle size={16} /> Save Session
-                                    </button>
-                                    <button className="btn btn-ghost" onClick={reset}>Discard</button>
+                                    {!transcribing && (
+                                        <>
+                                            <button className="btn btn-primary btn-lg" onClick={saveAndContinue}>
+                                                <CheckCircle size={16} /> Save Session
+                                            </button>
+                                            <button className="btn btn-ghost" onClick={reset}>Discard</button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -1,0 +1,59 @@
+/* Timer.css – Vercel monochrome */
+.timer-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 220px;
+    height: 220px;
+}
+
+.timer-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.timer-progress {
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.2));
+}
+
+.timer-wrapper.urgent .timer-progress {
+    filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.5));
+}
+
+.timer-dot {
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.6));
+}
+
+.timer-center {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.timer-digits {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s;
+}
+
+.timer-digits.urgent-text {
+    color: #ff4444;
+    animation: progress-pulse 0.6s ease-in-out infinite;
+}
+
+.timer-status {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}

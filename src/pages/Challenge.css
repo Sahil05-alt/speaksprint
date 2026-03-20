@@ -1,0 +1,317 @@
+/* Challenge.css – Vercel theme */
+.challenge-page {
+    background: var(--bg-base);
+}
+
+.challenge-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.challenge-header h1 {
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    margin-bottom: 6px;
+}
+
+.challenge-header p {
+    color: var(--text-secondary);
+}
+
+/* Settings row */
+.settings-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 28px;
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+}
+
+.setting-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* Segmented control */
+.seg-control {
+    display: flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    gap: 2px;
+}
+
+.seg-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+}
+
+.seg-btn:hover {
+    color: var(--text-primary);
+}
+
+.seg-btn.active {
+    background: var(--text-primary);
+    color: var(--text-on-accent);
+}
+
+/* Arena */
+.challenge-arena {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+/* Topic card */
+.topic-card {
+    width: 100%;
+    min-height: 170px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+    padding: 36px;
+}
+
+.topic-card.has-topic {
+    border-color: var(--border-accent);
+}
+
+.topic-word {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+}
+
+.topic-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.topic-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.topic-icon {
+    font-size: 2.8rem;
+}
+
+/* Countdown */
+.countdown-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 56px 40px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-lg);
+    width: 100%;
+}
+
+.countdown-number {
+    font-family: var(--font-display);
+    font-size: 6rem;
+    font-weight: 900;
+    color: var(--text-primary);
+}
+
+/* Video preview */
+.video-preview-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    aspect-ratio: 16/9;
+    background: #000;
+}
+
+.video-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    /* mirror */
+}
+
+.video-rec-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 68, 68, 0.4);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff4444;
+    letter-spacing: 0.08em;
+}
+
+/* Timer */
+.timer-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+/* Controls */
+.controls-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Done */
+.done-card {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+}
+
+.done-icon {
+    font-size: 3rem;
+}
+
+.done-card h2 {
+    font-size: 1.6rem;
+}
+
+.done-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.points-badge {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    padding: 10px 24px;
+    background: var(--bg-card-hover);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-md);
+}
+
+/* Playback */
+.playback-wrap {
+    width: 100%;
+    text-align: left;
+}
+
+.playback-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.audio-playback {
+    width: 100%;
+    accent-color: var(--text-primary);
+    border-radius: var(--radius-md);
+}
+
+.video-playback {
+    width: 100%;
+    border-radius: var(--radius-md);
+    max-height: 260px;
+    background: #000;
+    border: 1px solid var(--border-subtle);
+}
+
+.video-note {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-style: italic;
+}
+
+/* Recording indicator */
+.recording-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    color: #ff6666;
+    z-index: 200;
+    backdrop-filter: blur(8px);
+}
+
+.rec-dot {
+    width: 7px;
+    height: 7px;
+    background: #ff4444;
+    border-radius: 50%;
+    animation: blink-dot 1s ease-in-out infinite;
+}
+
+@media (max-width: 480px) {
+    .topic-word {
+        font-size: 1.8rem;
+    }
+
+    .done-card {
+        padding: 24px 16px;
+    }
+
+    .settings-row {
+        gap: 14px;
+    }
+}

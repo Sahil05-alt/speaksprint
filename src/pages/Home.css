@@ -1,0 +1,172 @@
+/* Home.css – Vercel theme */
+.home-page {
+    background: var(--bg-base);
+}
+
+.hero {
+    text-align: center;
+    padding: 48px 0 40px;
+    max-width: 640px;
+    margin: 0 auto 40px;
+}
+
+.hero-badge {
+    display: inline-flex;
+    margin-bottom: 20px;
+    font-size: 12px;
+}
+
+.hero-title {
+    font-size: clamp(2.4rem, 6vw, 4rem);
+    line-height: 1.1;
+    margin-bottom: 18px;
+}
+
+.hero-sub {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 500px;
+    margin: 0 auto 32px;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+@media (max-width: 600px) {
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.section-title {
+    font-size: 1.3rem;
+    margin-bottom: 18px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.section-header .section-title {
+    margin-bottom: 0;
+}
+
+.features-section {
+    margin-bottom: 40px;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 860px) {
+    .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feature-card {
+    text-align: center;
+    padding: 28px 16px;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+}
+
+.feature-icon {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.feature-card h3 {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+}
+
+.feature-card p {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.recent-section {
+    margin-bottom: 40px;
+}
+
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.recent-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.recent-topic {
+    font-weight: 600;
+    font-size: 14px;
+    flex: 1;
+}
+
+.recent-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.recent-date {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.cta-banner {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.cta-content h2 {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+}
+
+.cta-content p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}

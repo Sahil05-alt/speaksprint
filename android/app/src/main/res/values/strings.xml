@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SpeakSprint</string>
+    <string name="title_activity_main">SpeakSprint</string>
+    <string name="package_name">com.speaksprint.app</string>
+    <string name="custom_url_scheme">com.speaksprint.app</string>
+</resources>

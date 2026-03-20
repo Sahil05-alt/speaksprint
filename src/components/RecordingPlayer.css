@@ -1,0 +1,248 @@
+/* RecordingPlayer.css */
+
+/* --- Card shell --- */
+.rp-card {
+    position: relative;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color var(--transition-base);
+}
+
+.rp-card:hover {
+    border-color: var(--border-accent);
+}
+
+/* ── Audio mode ── */
+.rp-audio-mode {
+    padding: 0 0 60px;
+    /* space for controls at bottom */
+}
+
+/* Waveform */
+.rp-waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 80px;
+    padding: 16px 20px 0;
+}
+
+.rp-bar {
+    flex: 1;
+    max-width: 6px;
+    border-radius: 3px;
+    background: var(--border-subtle);
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.rp-bar.active {
+    background: var(--text-primary);
+}
+
+.rp-bar.pulse {
+    animation: bar-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes bar-pulse {
+    from {
+        transform: scaleY(0.85);
+    }
+
+    to {
+        transform: scaleY(1.15);
+    }
+}
+
+/* ── Video mode ── */
+.rp-video-mode {
+    padding: 0 0 60px;
+}
+
+.rp-video {
+    width: 100%;
+    display: block;
+    max-height: 260px;
+    object-fit: cover;
+    background: #000;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Video overlay play button */
+.rp-video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    bottom: 60px;
+    /* above controls */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.rp-video-overlay:hover {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.rp-overlay-btn {
+    width: 56px;
+    height: 56px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    backdrop-filter: blur(6px);
+    transition: all var(--transition-fast);
+}
+
+.rp-video-overlay:hover .rp-overlay-btn {
+    background: rgba(255, 255, 255, 0.22);
+    transform: scale(1.06);
+}
+
+/* ── Shared Controls bar ── */
+.rp-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* Play button */
+.rp-play-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--text-primary);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.rp-play-btn:hover {
+    opacity: 0.80;
+    transform: scale(1.06);
+}
+
+.rp-play-btn:active {
+    transform: scale(0.95);
+}
+
+/* Progress */
+.rp-progress {
+    flex: 1;
+    cursor: pointer;
+    padding: 12px 0;
+}
+
+.rp-progress-track {
+    position: relative;
+    height: 3px;
+    background: var(--border-subtle);
+    border-radius: 3px;
+}
+
+.rp-progress-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: var(--text-primary);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+}
+
+.rp-progress-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    width: 11px;
+    height: 11px;
+    background: var(--text-primary);
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+}
+
+.rp-progress:hover .rp-progress-thumb {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.rp-progress:hover .rp-progress-track {
+    height: 4px;
+}
+
+/* Time */
+.rp-time {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+}
+
+.rp-time-sep {
+    color: var(--text-muted);
+}
+
+/* Restart button */
+.rp-restart-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+    display: flex;
+    align-items: center;
+}
+
+.rp-restart-btn:hover {
+    color: var(--text-primary);
+}
+
+/* Type badge (top-right) */
+.rp-type-badge {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+    .rp-time {
+        display: none;
+    }
+}

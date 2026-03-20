@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { TOPICS } from '../data/words';
 import Timer from '../components/Timer';
-import { Mic, Video, VideoOff, Play, Pause, RotateCcw, CheckCircle, RefreshCw } from 'lucide-react';
 import RecordingPlayer from '../components/RecordingPlayer';
+import SpeechAnalysis from '../components/SpeechAnalysis';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { analyzeSpeech } from '../utils/analyzeSpeech';
+import { Mic, Video, VideoOff, Play, Pause, CheckCircle, RefreshCw } from 'lucide-react';
 import './Challenge.css';
 
 const TOTAL_SECONDS = 60;
@@ -15,15 +18,29 @@ export default function Challenge() {
 
     const [difficulty, setDifficulty] = useState('medium');
     const [topic, setTopic] = useState(null);
-    const [phase, setPhase] = useState('idle'); // idle | countdown | running | paused | done
+    const [phase, setPhase] = useState('idle'); // idle|countdown|running|paused|done
     const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
     const [countdownVal, setCountdownVal] = useState(3);
+    const [earnedPoints, setEarnedPoints] = useState(null);
 
-    // Recording mode
-    const [recordingMode, setRecordingMode] = useState('audio'); // 'audio' | 'video'
+    // Recording mode & state
+    const [recordingMode, setRecordingMode] = useState('audio');
     const [isRecording, setIsRecording] = useState(false);
     const [mediaDataUrl, setMediaDataUrl] = useState(null);
-    const [mediaType, setMediaType] = useState(null); // 'audio' | 'video'
+    const [mediaType, setMediaType] = useState(null);
+
+    // Speech recognition
+    const {
+        supported: srSupported,
+        finalTranscript,
+        interimTranscript,
+        start: srStart,
+        stop: srStop,
+    } = useSpeechRecognition();
+
+    // Analysis (computed once session is done)
+    const [analysis, setAnalysis] = useState(null);
+    const elapsedRef = useRef(0); // track duration actually spoken
 
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
@@ -31,8 +48,7 @@ export default function Challenge() {
     const videoPreviewRef = useRef(null);
     const intervalRef = useRef(null);
 
-    const [earnedPoints, setEarnedPoints] = useState(null);
-
+    // ── Topic ──────────────────────────────────────────────────
     function pickTopic() {
         const pool = TOPICS[difficulty];
         setTopic(pool[Math.floor(Math.random() * pool.length)]);
@@ -41,19 +57,28 @@ export default function Challenge() {
         setMediaDataUrl(null);
         setMediaType(null);
         setEarnedPoints(null);
+        setAnalysis(null);
         stopMedia();
+        srStop();
     }
 
+    // ── Session flow ───────────────────────────────────────────
     async function startSession() {
         if (!topic) return;
         setPhase('countdown');
         setCountdownVal(3);
+        elapsedRef.current = 0;
     }
 
     // 3-2-1 countdown
     useEffect(() => {
         if (phase !== 'countdown') return;
-        if (countdownVal <= 0) { setPhase('running'); beginRecording(); return; }
+        if (countdownVal <= 0) {
+            setPhase('running');
+            beginRecording();
+            srStart(); // start speech recognition
+            return;
+        }
         const t = setTimeout(() => setCountdownVal(v => v - 1), 1000);
         return () => clearTimeout(t);
     }, [phase, countdownVal]);
@@ -62,6 +87,7 @@ export default function Challenge() {
     useEffect(() => {
         if (phase !== 'running') { clearInterval(intervalRef.current); return; }
         intervalRef.current = setInterval(() => {
+            elapsedRef.current += 1;
             setTimeLeft(t => {
                 if (t <= 1) { clearInterval(intervalRef.current); finishSession(); return 0; }
                 return t - 1;
@@ -73,18 +99,30 @@ export default function Challenge() {
     function pauseSession() {
         setPhase('paused');
         mediaRecorderRef.current?.state === 'recording' && mediaRecorderRef.current.pause();
+        srStop();
     }
 
     function resumeSession() {
         setPhase('running');
         mediaRecorderRef.current?.state === 'paused' && mediaRecorderRef.current.resume();
+        srStart();
     }
 
     async function finishSession() {
         setPhase('done');
+        srStop();
         await stopMedia();
+        // Run analysis using the final transcript captured so far
+        const result = analyzeSpeech(finalTranscript, elapsedRef.current || TOTAL_SECONDS);
+        setAnalysis(result);
     }
 
+    async function handleFinishEarly() {
+        clearInterval(intervalRef.current);
+        await finishSession();
+    }
+
+    // ── Recording ──────────────────────────────────────────────
     async function beginRecording() {
         try {
             const constraints = recordingMode === 'video'
@@ -95,7 +133,6 @@ export default function Challenge() {
             streamRef.current = stream;
             chunksRef.current = [];
 
-            // Show live preview if video
             if (recordingMode === 'video' && videoPreviewRef.current) {
                 videoPreviewRef.current.srcObject = stream;
                 videoPreviewRef.current.play().catch(() => { });
@@ -110,18 +147,12 @@ export default function Challenge() {
             mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
             mr.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: mimeType });
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setMediaDataUrl(reader.result);
-                    setMediaType(recordingMode);
-                };
-                // Only read blob if it's audio (video blobs too large for localStorage)
                 if (recordingMode === 'audio') {
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setMediaDataUrl(reader.result); setMediaType('audio'); };
                     reader.readAsDataURL(blob);
                 } else {
-                    // For video: create object URL for playback only (not persisted)
-                    const objUrl = URL.createObjectURL(blob);
-                    setMediaDataUrl(objUrl);
+                    setMediaDataUrl(URL.createObjectURL(blob));
                     setMediaType('video');
                 }
                 stream.getTracks().forEach(t => t.stop());
@@ -131,34 +162,25 @@ export default function Challenge() {
             mr.start();
             setIsRecording(true);
         } catch (err) {
-            console.warn('Media not available:', err);
+            console.warn('Media unavailable:', err);
         }
     }
 
     function stopMedia() {
         return new Promise(resolve => {
             if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                const originalStop = mediaRecorderRef.current.onstop;
-                mediaRecorderRef.current.onstop = async (...args) => {
-                    if (originalStop) await originalStop(...args);
-                    resolve();
-                };
+                const orig = mediaRecorderRef.current.onstop;
+                mediaRecorderRef.current.onstop = async (...a) => { if (orig) await orig(...a); resolve(); };
                 mediaRecorderRef.current.stop();
             } else resolve();
         });
     }
 
-    async function handleFinishEarly() {
-        clearInterval(intervalRef.current);
-        await finishSession();
-    }
-
+    // ── Save ───────────────────────────────────────────────────
     function saveAndContinue() {
         const pts = addSession({
-            topic,
-            difficulty,
-            duration: TOTAL_SECONDS - timeLeft,
-            // Only save audio data URLs (video too large for localStorage)
+            topic, difficulty,
+            duration: elapsedRef.current || TOTAL_SECONDS,
             audioDataUrl: mediaType === 'audio' ? mediaDataUrl : null,
         });
         setEarnedPoints(pts);
@@ -167,7 +189,8 @@ export default function Challenge() {
     function reset() {
         setPhase('idle'); setTimeLeft(TOTAL_SECONDS);
         setTopic(null); setMediaDataUrl(null);
-        setMediaType(null); setEarnedPoints(null);
+        setMediaType(null); setEarnedPoints(null); setAnalysis(null);
+        elapsedRef.current = 0;
     }
 
     const diffLabels = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
@@ -182,10 +205,9 @@ export default function Challenge() {
                     <p>Pick a topic, hit start, and speak for 60 seconds.</p>
                 </div>
 
-                {/* Controls row: difficulty + recording mode */}
+                {/* Settings (shown only on idle) */}
                 {phase === 'idle' && !earnedPoints && (
                     <div className="settings-row animate-fadeIn">
-                        {/* Difficulty */}
                         <div className="setting-group">
                             <span className="setting-label">Difficulty</span>
                             <div className="seg-control">
@@ -201,20 +223,13 @@ export default function Challenge() {
                             </div>
                         </div>
 
-                        {/* Recording mode */}
                         <div className="setting-group">
                             <span className="setting-label">Record</span>
                             <div className="seg-control">
-                                <button
-                                    className={`seg-btn ${recordingMode === 'audio' ? 'active' : ''}`}
-                                    onClick={() => setRecordingMode('audio')}
-                                >
+                                <button className={`seg-btn ${recordingMode === 'audio' ? 'active' : ''}`} onClick={() => setRecordingMode('audio')}>
                                     <Mic size={13} /> Audio
                                 </button>
-                                <button
-                                    className={`seg-btn ${recordingMode === 'video' ? 'active' : ''}`}
-                                    onClick={() => setRecordingMode('video')}
-                                >
+                                <button className={`seg-btn ${recordingMode === 'video' ? 'active' : ''}`} onClick={() => setRecordingMode('video')}>
                                     <Video size={13} /> Video
                                 </button>
                             </div>
@@ -226,7 +241,7 @@ export default function Challenge() {
                 <div className="challenge-arena">
 
                     {/* Topic card */}
-                    {phase !== 'countdown' && (
+                    {phase !== 'countdown' && phase !== 'done' && (
                         <div className={`topic-card card ${topic ? 'has-topic' : ''} animate-fadeInScale`}>
                             {topic
                                 ? <>
@@ -242,7 +257,7 @@ export default function Challenge() {
                         </div>
                     )}
 
-                    {/* 3-2-1 countdown */}
+                    {/* Countdown */}
                     {phase === 'countdown' && (
                         <div className="countdown-overlay animate-fadeInScale">
                             <div className="countdown-number animate-bounce-in" key={countdownVal}>
@@ -255,32 +270,31 @@ export default function Challenge() {
                     {/* Live video preview */}
                     {(phase === 'running' || phase === 'paused') && recordingMode === 'video' && (
                         <div className="video-preview-wrap">
-                            <video
-                                ref={videoPreviewRef}
-                                className="video-preview"
-                                muted
-                                playsInline
-                                autoPlay
-                            />
-                            {isRecording && (
-                                <div className="video-rec-badge">
-                                    <span className="rec-dot" /> REC
-                                </div>
-                            )}
+                            <video ref={videoPreviewRef} className="video-preview" muted playsInline autoPlay />
+                            {isRecording && <div className="video-rec-badge"><span className="rec-dot" /> REC</div>}
                         </div>
                     )}
 
                     {/* Timer */}
-                    {(phase === 'running' || phase === 'paused' || phase === 'done') && (
+                    {(phase === 'running' || phase === 'paused') && (
                         <div className="timer-section animate-fadeIn">
-                            <Timer
-                                timeLeft={timeLeft}
-                                isRunning={phase === 'running'}
-                                isPaused={phase === 'paused'}
-                            />
+                            <Timer timeLeft={timeLeft} isRunning={phase === 'running'} isPaused={phase === 'paused'} />
                             <div className="progress-bar-track" style={{ width: '220px' }}>
                                 <div className="progress-bar-fill" style={{ width: `${(timeLeft / TOTAL_SECONDS) * 100}%` }} />
                             </div>
+                        </div>
+                    )}
+
+                    {/* Live transcript strip */}
+                    {(phase === 'running' || phase === 'paused') && srSupported && (
+                        <div className="live-transcript-strip">
+                            {finalTranscript || interimTranscript
+                                ? <>
+                                    <span>{finalTranscript}</span>
+                                    {interimTranscript && <span className="interim"> {interimTranscript}</span>}
+                                </>
+                                : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Listening… start speaking</span>
+                            }
                         </div>
                     )}
 
@@ -294,20 +308,26 @@ export default function Challenge() {
                             {earnedPoints !== null ? (
                                 <div className="done-actions">
                                     <div className="points-badge">+{earnedPoints} pts earned</div>
-                                    <button className="btn btn-primary btn-lg" onClick={() => navigate('/dashboard')}>
-                                        View Progress
-                                    </button>
+                                    <button className="btn btn-primary btn-lg" onClick={() => navigate('/dashboard')}>View Progress</button>
                                     <button className="btn btn-ghost" onClick={reset}>New Session</button>
                                 </div>
                             ) : (
                                 <div className="done-actions">
-                                    {/* Playback */}
-                                    {mediaDataUrl && (
-                                        <RecordingPlayer src={mediaDataUrl} type={mediaType} />
-                                    )}
+                                    {/* Recording playback */}
+                                    {mediaDataUrl && <RecordingPlayer src={mediaDataUrl} type={mediaType} />}
                                     {mediaDataUrl && mediaType === 'video' && (
                                         <p className="video-note">Video is session-only and won't be saved to history.</p>
                                     )}
+
+                                    {/* Speech analysis */}
+                                    {analysis && (
+                                        <SpeechAnalysis
+                                            analysis={analysis}
+                                            transcript={finalTranscript}
+                                            supported={srSupported}
+                                        />
+                                    )}
+
                                     <button className="btn btn-primary btn-lg" onClick={saveAndContinue}>
                                         <CheckCircle size={16} /> Save Session
                                     </button>
@@ -317,7 +337,7 @@ export default function Challenge() {
                         </div>
                     )}
 
-                    {/* Controls */}
+                    {/* Session controls */}
                     {phase !== 'done' && (
                         <div className="controls-row">
                             {phase === 'idle' && (
@@ -348,11 +368,10 @@ export default function Challenge() {
                     )}
                 </div>
 
-                {/* Recording indicator (audio only, video has on-screen badge) */}
+                {/* Recording indicator */}
                 {isRecording && recordingMode === 'audio' && (
                     <div className="recording-bar">
-                        <span className="rec-dot" />
-                        <Mic size={13} /> Recording…
+                        <span className="rec-dot" /><Mic size={13} /> Recording…
                     </div>
                 )}
             </div>

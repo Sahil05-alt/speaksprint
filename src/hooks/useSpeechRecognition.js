@@ -1,5 +1,6 @@
 // src/hooks/useSpeechRecognition.js
-// Uses the browser-native Web Speech API — no API keys, no cost.
+// Browser-native Web Speech API — no API keys required.
+// Fixes: auto-restarts when browser stops recognition mid-session (common in Chrome).
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -13,28 +14,18 @@ export function useSpeechRecognition() {
     const [error, setError] = useState(null);
 
     const recognitionRef = useRef(null);
+    const shouldRunRef = useRef(false); // true while session is active
+    const finalAccumRef = useRef('');   // keep running total outside state
     const supported = Boolean(SpeechRecognitionAPI);
 
-    // Build a new recognition instance each session
-    function buildRecognition() {
-        if (!supported) return null;
+    function createAndStart() {
+        if (!shouldRunRef.current) return;
+
         const sr = new SpeechRecognitionAPI();
-        sr.continuous = true;   // keep listening until we stop it
-        sr.interimResults = true;   // stream partial results live
+        sr.continuous = true;
+        sr.interimResults = true;
         sr.lang = 'en-US';
         sr.maxAlternatives = 1;
-        return sr;
-    }
-
-    const start = useCallback(() => {
-        if (!supported) { setError('Speech recognition not supported in this browser.'); return; }
-
-        // Reset state
-        setFinalTranscript('');
-        setInterimTranscript('');
-        setError(null);
-
-        const sr = buildRecognition();
 
         sr.onresult = (event) => {
             let interim = '';
@@ -47,20 +38,29 @@ export function useSpeechRecognition() {
                     interim += text;
                 }
             }
-            if (final) setFinalTranscript(prev => prev + final);
+            if (final) {
+                finalAccumRef.current += final;
+                setFinalTranscript(finalAccumRef.current);
+            }
             setInterimTranscript(interim);
         };
 
         sr.onerror = (e) => {
-            // 'no-speech' is expected when user is quiet; don't surface as a UI error
-            if (e.error !== 'no-speech') {
-                setError(e.error);
-            }
+            // Ignore expected "no-speech" and "aborted" (our own stop() call)
+            if (e.error === 'no-speech' || e.error === 'aborted') return;
+            console.warn('[SpeechRecognition] error:', e.error);
+            setError(e.error);
         };
 
+        // KEY FIX: auto-restart if we're still supposed to be listening
         sr.onend = () => {
-            setIsListening(false);
             setInterimTranscript('');
+            if (shouldRunRef.current) {
+                // Browser stopped recognition (silence timeout, etc.) — restart immediately
+                try { createAndStart(); } catch (_) { }
+            } else {
+                setIsListening(false);
+            }
         };
 
         recognitionRef.current = sr;
@@ -68,21 +68,43 @@ export function useSpeechRecognition() {
             sr.start();
             setIsListening(true);
         } catch (e) {
-            setError(e.message);
+            // If already started, ignore
+            if (!e.message.includes('already started')) {
+                setError(e.message);
+            }
         }
+    }
+
+    const start = useCallback(() => {
+        if (!supported) { setError('Speech recognition not supported in this browser.'); return; }
+
+        // Reset
+        finalAccumRef.current = '';
+        setFinalTranscript('');
+        setInterimTranscript('');
+        setError(null);
+        shouldRunRef.current = true;
+
+        createAndStart();
     }, [supported]);
 
     const stop = useCallback(() => {
+        shouldRunRef.current = false;
+        setInterimTranscript('');
+        setIsListening(false);
         if (recognitionRef.current) {
-            recognitionRef.current.stop();
+            try { recognitionRef.current.stop(); } catch (_) { }
             recognitionRef.current = null;
         }
-        setIsListening(false);
-        setInterimTranscript('');
     }, []);
 
-    // Hard-stop on unmount
-    useEffect(() => () => stop(), [stop]);
+    // Cleanup on unmount
+    useEffect(() => () => {
+        shouldRunRef.current = false;
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch (_) { }
+        }
+    }, []);
 
     return {
         supported,
